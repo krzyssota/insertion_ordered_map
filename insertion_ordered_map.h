@@ -55,10 +55,16 @@ class insertion_ordered_map {
 
     shared_ptr<map_buffer<K, V, Hash>> data_ptr;
     void about_to_modify(bool mark_unsharable = false) {
-        if(data_ptr->refs > 1 && !data_ptr->unsharable) {
-            auto* new_data = new map_buffer<K, V, Hash>(data_ptr); // ?new_data(data_ptr)?
+        if(data_ptr->refs > 1) { // && !data_ptr->unsharable
+            shared_ptr<map_buffer<K, V, Hash>> new_data_ptr;
+            try {
+                new_data_ptr = make_shared(*data_ptr); // ?new_data(data_ptr)?
+            }
+            catch (exception e) {
+
+            }
             --data_ptr->refs;
-            data_ptr = new_data;
+            data_ptr = new_data_ptr;
         } else {
             // chyba nic bo unordered_map samo się powiekszy
         }
