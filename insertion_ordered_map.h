@@ -11,8 +11,10 @@ using namespace std;
 template<typename V>
 struct list_entry {
     V value;
-    list_entry<V> *next;
-    list_entry<V> *previous;
+    shared_ptr<list_entry<V>> next;
+    shared_ptr<list_entry<V>> previous;
+
+    list_entry(V v) : value(v), next(NULL), previous(NULL) {};
 };
 
 template<class K, class V, class Hash = std::hash<K>>
@@ -80,11 +82,15 @@ public:
     V &operator[](K const &k){
         about_to_modify(true);
         auto it = data_ptr->buf.find(k);
-        if(it != data_ptr->buf.end()){
-            //...
+        if(it != data_ptr->buf.end()){ // found
             return it->second.value;
         } else {
-            //...
+            auto valueEntry = make_shared<list_entry>(list_entry(V()));
+            data_ptr->buf.insert({k, *valueEntry});
+            data_ptr->buf.last->next = valueEntry;
+            valueEntry->previous = data_ptr->buf.last;
+            data_ptr->buf.last = valueEntry;
+            return valueEntry->value;
         }
     }
 
