@@ -3,10 +3,10 @@
 
 #include <iostream>
 #include <unordered_map>
+#include <bits/shared_ptr.h>
 
 
 using namespace std;
-const size_t unshareable = numeric_limits<size_t>::max();
 
 template<typename V>
 struct list_entry {
@@ -18,19 +18,19 @@ struct list_entry {
 template<class K, class V, class Hash = std::hash<K>>
 class map_buffer {
     unordered_map<K, list_entry<V>, Hash> buf;
-    list_entry<V> *first; // fixme smart pointer
-    list_entry<V> *last;
+    shared_ptr<list_entry<V>> first;
+    shared_ptr<list_entry<V>> last;
     unsigned refs;
-    bool unshareable;
+    bool unsharable;
 
     public :
 
     map_buffer() : buf(), first(NULL), last(NULL),
-    refs(1), unshareable(false){ // default constructor moze niepotrzebne
+    refs(1), unsharable(false){ // default constructor moze niepotrzebne
     }
     map_buffer(const map_buffer<K, V, Hash> & other)  // copy constructor
     : buf(other.buf), first(other.first), last(other.last),
-    refs(1), unshareable(false) {
+    refs(1), unsharable(false) {
 
     }
     map_buffer &operator=(const map_buffer &) = delete;
@@ -39,16 +39,16 @@ class map_buffer {
         first = other.first;
         last = other.last;
         refs = other.refs;
-        unshareable = other.unshareable;
+        unsharable = other.unsharable;
     }
 };
 
 template<class K, class V, class Hash = std::hash<K>>
 class insertion_ordered_map {
 
-    map_buffer<K, V, Hash> *data;
+    shared_ptr<map_buffer<K, V, Hash>> data;
     void about_to_modify(bool mark_unshareable = false) {
-        if(data->refs > 1 && !data->unshareable) {
+        if(data->refs > 1 && !data->unsharable) {
             auto* new_data = new map_buffer<K, V, Hash>(data); // ?new_data(data)?
             --data->refs;
             data = new_data;
@@ -56,8 +56,7 @@ class insertion_ordered_map {
             // chyba nic bo unordered_map samo się powiekszy
         }
         if(mark_unshareable){
-            data->unshareable = true;
-            data->refs = unshareable; // ???
+            data->unsharable = true;
         }
         else {
             data->refs = 1;
@@ -82,7 +81,7 @@ public:
     złożoność czasowa O(1) lub oczekiwana O(n), jeśli konieczne jest wykonanie kopii.
     insertion_ordered_map(insertion_ordered_map const &other);*/
     insertion_ordered_map<K, V, Hash>(const insertion_ordered_map<K,V,Hash>& other) {
-        if(other.data->unshareable) {
+        if(other.data->unsharable) {
             data = new map_buffer<K, V, Hash>(other.data);
         } else {
             data = other.data;
