@@ -14,16 +14,14 @@ class lookup_error: public exception {
     }
 };
 
-
-
 template<typename K, typename V>
 struct list_entry {
 private :
-    using map_entry = pair<K, list_entry<K, V>>;
 public :
+    K key;
     V value;
-    shared_ptr<map_entry> next;
-    shared_ptr<map_entry> prev;
+    shared_ptr<list_entry> next;
+    shared_ptr<list_entry> prev;
 
     list_entry(V v) : value(v), next(NULL), prev(NULL) {};
 };
