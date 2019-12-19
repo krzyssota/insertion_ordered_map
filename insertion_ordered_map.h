@@ -28,7 +28,7 @@ public :
 
 template<class K, class V, class Hash = std::hash<K>>
 class map_buffer {
-    unordered_map<K, list_entry<K, V>, Hash> buf;
+    unordered_map<K, list_entry<K, V>, Hash> map;
     shared_ptr<list_entry<K, V>> first;
     shared_ptr<list_entry<K, V>> last;
     unsigned refs;
@@ -37,52 +37,62 @@ class map_buffer {
 public :
 
     map_buffer(const map_buffer<K, V, Hash> & other)  // copy constructor
-            : buf(other.buf), first(other.first), last(other.last),
+            : map(other.map), first(other.first), last(other.last),
               refs(1), unsharable(false) {
-
     }
+
     map_buffer &operator=(const map_buffer & other) {
-        this->first = other.first;
-        this->last = other.last;
-        this->buf = buf(other.buf);
+        this->map = map(other.map); // tutaj kopia
+        this->first = findPtr(other.first);
+        this->last = findPtr(other.last);
         this->refs = 1;
         this->unsharable = false;
         return *this;
-    };
+    }
+
     map_buffer(map_buffer<K, V, Hash> &&other) noexcept {
-        buf = move(other.buf);
+        map = move(other.map);
         first = other.first;
         last = other.last;
         refs = other.refs;
         unsharable = other.unsharable;
+    }
+
+    shared_ptr<list_entry<K, V>> findPtr(list_entry<K, V>& other) {
+        auto it = map.find(other.key);
+        if(it != other.end()) {
+            return make_shared(it->second); // wskaznik do obiektu list_entry
+        } else {
+            // never happens
+        }
     }
 };
 
 template<class K, class V, class Hash = std::hash<K>>
 class insertion_ordered_map {
 
-    shared_ptr<map_buffer<K, V, Hash>> data_ptr;
+    shared_ptr<map_buffer<K, V, Hash>> buf_ptr;
 
     void about_to_modify(bool mark_unsharable = false) {
-        if(data_ptr->refs > 1) { // && !data_ptr->unsharable
+        if(buf_ptr->refs > 1) { // && !buf_ptr->unsharable
             shared_ptr<map_buffer<K, V, Hash>> new_data_ptr;
             try {
-                new_data_ptr = make_shared(*data_ptr);
+                new_data_ptr = make_shared(*buf_ptr);
             }
             catch (bad_alloc &e) {
                 // chyba zalezy od miejsca wywołania about_to_modify
                 throw;
             }
-            --data_ptr->refs;
-            data_ptr = new_data_ptr;
+            --buf_ptr->refs;
+            buf_ptr = new_data_ptr;
         } else {
             // chyba nic bo unordered_map samo się powiekszy
         }
         if(mark_unsharable){
-            data_ptr->unsharable = true;
+            buf_ptr->unsharable = true;
         }
         else {
-            data_ptr->refs = 1;
+            buf_ptr->refs = 1;
         }
     }
 
@@ -94,39 +104,38 @@ public:
       złożoność czasowa O(1) lub oczekiwana O(n), jeśli konieczne jest wykonanie kopii.
       insertion_ordered_map(insertion_ordered_map const &other);*/
     insertion_ordered_map<K, V, Hash>(const insertion_ordered_map<K,V,Hash>& other) {
-        if(other.data_ptr->unsharable) {
-            data_ptr = new map_buffer<K, V, Hash>(other.data_ptr);
+        if(other.buf_ptr->unsharable) {
+            buf_ptr = new map_buffer<K, V, Hash>(other.buf_ptr);
         } else {
-            data_ptr = other.data_ptr;
-            ++data_ptr->refs;
+            buf_ptr = other.buf_ptr;
+            ++buf_ptr->refs;
         }
     }
 
     insertion_ordered_map(insertion_ordered_map &&other) noexcept {
-        data_ptr = make_shared<map_buffer<V, K, Hash>>(move(*other.data_ptr));
+        buf_ptr = make_shared<map_buffer<V, K, Hash>>(move(*other.buf_ptr));
     }
 
     V &operator[](K const &k){
 
         about_to_modify(true);
 
-        auto it = data_ptr->buf.find(k);
-        if(it != data_ptr->buf.end()){ // found
+        auto it = buf_ptr->map.find(k);
+        if(it != buf_ptr->map.end()){ // found
             return it->second.value;
         } else {
 
             try {
-                shared_ptr<insertion_ordered_map<K, V, Hash>> tmpCopy;
-                tmpCopy = make_shared(*this); // copy our structure
+                shared_ptr<insertion_ordered_map<K, V, Hash>> tmpCopy = make_shared(*this); // copy our structure
 
-                shared_ptr<list_entry<K, V>> valueEntry = make_shared<list_entry>(list_entry(V()));
+                shared_ptr<list_entry<K, V>> valueEntry = make_shared(list_entry(V()));
 
                 tmpCopy.insert({k, *valueEntry});
                 tmpCopy.last->next = valueEntry;
                 valueEntry->previous = tmpCopy.last;
                 tmpCopy.last = valueEntry;
 
-                data_ptr = &tmpCopy; // swap
+                buf_ptr = &tmpCopy; // swap
 
                 return valueEntry->value;
 
@@ -142,14 +151,14 @@ public:
     Jeśli taki klucz nie istnieje, to podnosi wyjątek lookup_error.
     Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
     void erase(K const &k) {
-        auto it = data_ptr->buf.find(k);
+        auto it = buf_ptr->map.find(k);
 
-        if(it != data_ptr->buf.end()) { // found
+        if(it != buf_ptr->map.end()) { // found
             auto p = it.second->prev;
             auto n = it.second->next;
             p->next = n;
             n->prev = p;
-            data_ptr->buf.erase(k);
+            buf_ptr->map.erase(k);
         } else {
             throw lookup_error();
         }
@@ -167,10 +176,11 @@ public:
 
 };
 
+
 template <typename K, typename V>
 class it {
     shared_ptr<K> first;
-    shared_ptr<list_entry<V>> second;
+    shared_ptr<list_entry<K, V>> second;
 public:
     it(){
         //first = make_shared(NULL);
@@ -191,7 +201,6 @@ public:
     it& operator++(){
         first = make_shared((*this).second->next);
     }
-
 };
 
 
