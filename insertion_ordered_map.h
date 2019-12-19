@@ -11,8 +11,9 @@ using namespace std;
 template<typename V>
 struct list_entry {
     V value;
-    list_entry<V> *next;
-    list_entry<V> *previous;
+    shared_ptr<list_entry<V>> next;
+    shared_ptr<list_entry<V>> previous;
+    list_entry(V const &v) : value(v), next(nullptr), previous(nullptr) {}
 };
 
 template<class K, class V, class Hash = std::hash<K>>
@@ -56,13 +57,7 @@ class insertion_ordered_map {
     shared_ptr<map_buffer<K, V, Hash>> data_ptr;
     void about_to_modify(bool mark_unsharable = false) {
         if(data_ptr->refs > 1) { // && !data_ptr->unsharable
-            shared_ptr<map_buffer<K, V, Hash>> new_data_ptr;
-            try {
-                new_data_ptr = make_shared(*data_ptr); // ?new_data(data_ptr)?
-            }
-            catch (exception e) {
-
-            }
+            shared_ptr<map_buffer<K, V, Hash>> new_data_ptr = make_shared(*data_ptr); // ?new_data(data_ptr)?
             --data_ptr->refs;
             data_ptr = new_data_ptr;
         } else {
@@ -105,6 +100,16 @@ public:
     insertion_ordered_map(insertion_ordered_map &&other) noexcept
     {
         data_ptr = make_shared<map_buffer<V, K, Hash>>(move(*other.data_ptr));
+    }
+
+    bool insert(K const &k, V const &v) {
+        auto it = data_ptr->buf.find(k);
+        if (it == data_ptr->buf.end() || *it != data_ptr->last) {
+            shared_ptr<list_entry<V>> list_ptr = make_shared(v);
+
+            about_to_modify(false);
+
+        }
     }
 };
 
