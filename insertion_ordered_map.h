@@ -214,15 +214,15 @@ public:
         auto list_ = buf_ptr->ordered_list;
         auto map_ = buf_ptr->map_data;
         typename std::list<pair<K, V>>::iterator list_it;
-        typename std::unordered_map<K, typename std::list<pair<K, V>>::iterator> map_it = map_.find(k);
+        auto map_it = map_.find(k);
 
         if(map_it == map_.end()) { // not in the map
 
             try {
                 about_to_modify(true); // potencjalny restore w środku
-                auto newPair = {k, v};
+                auto newPair = make_pair(k, v);
                 list_.push_back(newPair);
-                list_it = list_.end() - 1; // pointing at new element
+                list_it = --list_.end(); // pointing at new element
             } catch (bad_alloc &e) {
                 // newPair not added to the list
                 throw;
@@ -235,8 +235,8 @@ public:
                 throw;
             }
         } else { // key already contained in the map
-            list_it = map_it.second;
-            pair<K, V> touched_element = {list_it.first, list_it.second};
+            list_it = map_it->second;
+            pair<K, V> touched_element = make_pair(list_it->first, list_it->second);
             list_.erase(list_it);
             list_.push_back(touched_element);
             // dlaczego szare?
@@ -265,7 +265,7 @@ public:
     }
 
     bool contains(K const &k) {
-
+        return buf_ptr->map_data.find(k) != buf_ptr->map_data.end();
     }
 
     /*
