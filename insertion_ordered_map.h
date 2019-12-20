@@ -178,9 +178,10 @@ public:
                 throw;
             }
             try {
-                buf_ptr->map_data.insert(k); // todo tutaj wstawic it
-                auto it2 = buf_ptr->map_data.end();
-                return *(it2-1);
+                auto tmp_it = buf_ptr->ordered_list.end();
+                --tmp_it;
+                buf_ptr->map_data[k] = tmp_it;
+                return tmp_it->second;
             } catch (bad_alloc &e) {
                 restore();
                 buf_ptr->ordered_list.pop_back();
