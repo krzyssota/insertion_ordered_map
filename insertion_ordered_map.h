@@ -15,9 +15,6 @@ class lookup_error : public exception {
     }
 };
 
-// TODO
-// mapa ma miec Value smartfpointer na list_entry i naprawic konstruktory
-
 template<class K, class V, class Hash = std::hash<K>>
 class map_buffer {
 
