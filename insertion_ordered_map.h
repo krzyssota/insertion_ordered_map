@@ -4,6 +4,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <bits/shared_ptr.h>
+#include <list>
 
 
 using namespace std;
@@ -16,23 +17,15 @@ class lookup_error : public exception {
 
 // TODO
 // mapa ma miec Value smartfpointer na list_entry i naprawic konstruktory
-template<typename K, typename V>
-struct list_entry {
-private :
-public :
-    K key;
-    V value;
-    shared_ptr<list_entry> next;
-    shared_ptr<list_entry> prev;
-
-    list_entry(V v) : value(v), next(NULL), prev(NULL) {};
-};
 
 template<class K, class V, class Hash = std::hash<K>>
 class map_buffer {
-    unordered_map<K, list_entry<K, V>, Hash> map;
-    shared_ptr<list_entry<K, V>> first;
-    shared_ptr<list_entry<K, V>> last;
+//    unordered_map<K, list_entry<K, V>, Hash> map;
+    unordered_map<K, iterator<bidirectional_iterator_tag, list<K, V>>, Hash> map;
+    list<pair<K, V>> list;
+
+//    shared_ptr<list_entry<K, V>> first;
+//    shared_ptr<list_entry<K, V>> last;
     unsigned refs;
     unsigned old_refs;
     bool unsharable;
@@ -51,14 +44,13 @@ public :
     }
 
     map_buffer(const map_buffer<K, V, Hash> &other)  // copy constructor
-            : map(other.map), first(other.first), last(other.last),
+            : map(other.map), list(other.list),
               refs(1), unsharable(false) {
     }
 
     map_buffer &operator=(const map_buffer &other) {
         this->map = map(other.map); // tutaj kopia
-        this->first = findPtr(other.first);
-        this->last = findPtr(other.last);
+        this->list = list(other.list);
         this->refs = 1;
         this->unsharable = false;
         return *this;
@@ -66,19 +58,9 @@ public :
 
     map_buffer(map_buffer<K, V, Hash> &&other) noexcept {
         map = move(other.map);
-        first = other.first;
-        last = other.last;
+        list = move(other.list);
         refs = other.refs;
         unsharable = other.unsharable;
-    }
-
-    shared_ptr<list_entry<K, V>> findPtr(list_entry<K, V> &other) {
-        auto it = map.find(other.key);
-        if (it != other.end()) {
-            return make_shared(it->second); // wskaznik do obiektu list_entry
-        } else {
-            // never happens
-        }
     }
 };
 
@@ -163,14 +145,7 @@ public:
         } else {
 
             try {
-                shared_ptr<list_entry<K, V>> valueEntry = make_shared(list_entry(V()));
-
-                buf_ptr.insert({k, *valueEntry});
-                buf_ptr.last->next = valueEntry;
-                valueEntry->previous = buf_ptr.last;
-                buf_ptr.last = valueEntry;
-
-                return valueEntry->value;
+                
 
             } catch (bad_alloc &e) {
                 restore();
