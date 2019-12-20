@@ -45,7 +45,6 @@ public :
     }
 
     map_buffer(const map_buffer<K, V> &other)  // copy constructor
-
             : ordered_list(other.ordered_list),
               refs(1), old_refs(1), unsharable(false), old_unsharable(false), map_data() {
         auto it = ordered_list.begin();
@@ -56,10 +55,15 @@ public :
     }
 
     map_buffer &operator=(const map_buffer &other) {
-        this->map_data = map_data(other.map_data);
-        this->ordered_list = ordered_list(other.ordered_list);
-        this->refs = 1;
-        this->unsharable = false;
+        map_data();
+        ordered_list = ordered_list(other.ordered_list);
+        refs = 1;
+        unsharable = false;
+        auto it = ordered_list.begin();
+        while (it != ordered_list.end()) {
+            map_data[it->first] = it;
+            it++;
+        }
         return *this;
     }
 
