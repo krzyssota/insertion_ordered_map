@@ -8,12 +8,14 @@
 
 using namespace std;
 
-class lookup_error: public exception {
-    virtual const char* what() const throw() {
+class lookup_error : public exception {
+    virtual const char *what() const throw() {
         return "lookup_error";
     }
 };
 
+// TODO
+// mapa ma miec Value smartfpointer na list_entry i naprawic konstruktory
 template<typename K, typename V>
 struct list_entry {
 private :
@@ -32,16 +34,28 @@ class map_buffer {
     shared_ptr<list_entry<K, V>> first;
     shared_ptr<list_entry<K, V>> last;
     unsigned refs;
+    unsigned old_refs;
     bool unsharable;
+    bool old_unsharable;
 
 public :
 
-    map_buffer(const map_buffer<K, V, Hash> & other)  // copy constructor
+    void memorize() {
+        old_unsharable = unsharable;
+        old_refs = refs;
+    }
+
+    void restore() {
+        unsharable = old_unsharable;
+        refs = old_refs;
+    }
+
+    map_buffer(const map_buffer<K, V, Hash> &other)  // copy constructor
             : map(other.map), first(other.first), last(other.last),
               refs(1), unsharable(false) {
     }
 
-    map_buffer &operator=(const map_buffer & other) {
+    map_buffer &operator=(const map_buffer &other) {
         this->map = map(other.map); // tutaj kopia
         this->first = findPtr(other.first);
         this->last = findPtr(other.last);
@@ -58,9 +72,9 @@ public :
         unsharable = other.unsharable;
     }
 
-    shared_ptr<list_entry<K, V>> findPtr(list_entry<K, V>& other) {
+    shared_ptr<list_entry<K, V>> findPtr(list_entry<K, V> &other) {
         auto it = map.find(other.key);
-        if(it != other.end()) {
+        if (it != other.end()) {
             return make_shared(it->second); // wskaznik do obiektu list_entry
         } else {
             // never happens
@@ -71,40 +85,60 @@ public :
 template<class K, class V, class Hash = std::hash<K>>
 class insertion_ordered_map {
 
+    shared_ptr<map_buffer<K, V, Hash>> old_buf_ptr;
+
     shared_ptr<map_buffer<K, V, Hash>> buf_ptr;
 
-    void about_to_modify(bool mark_unsharable = false) {
-        if(buf_ptr->refs > 1) { // && !buf_ptr->unsharable
-            shared_ptr<map_buffer<K, V, Hash>> new_data_ptr;
+    shared_ptr<map_buffer<K, V, Hash>> about_to_modify(bool mark_unsharable = false) {
+
+//        shared_ptr<map_buffer<K, V, Hash>> old_buf_ptr = buf_ptr;
+
+        memorize();
+
+        if (buf_ptr->refs > 1) { // && !buf_ptr->unsharable
+            shared_ptr<map_buffer<K, V, Hash>> new_buf_ptr;
             try {
-                new_data_ptr = make_shared(*buf_ptr);
+                new_buf_ptr = make_shared(*buf_ptr);
             }
             catch (bad_alloc &e) {
                 // chyba zalezy od miejsca wywołania about_to_modify
                 throw;
             }
             --buf_ptr->refs;
-            buf_ptr = new_data_ptr;
+            buf_ptr = new_buf_ptr;
         } else {
             // chyba nic bo unordered_map samo się powiekszy
         }
-        if(mark_unsharable){
+
+        if (mark_unsharable) {
             buf_ptr->unsharable = true;
-        }
-        else {
+        } else {
             buf_ptr->refs = 1;
         }
+
+        return old_buf_ptr;
     }
 
 public:
+
+    void memorize() {
+        buf_ptr->memorize();
+        old_buf_ptr = buf_ptr;
+    }
+
+    void restore() {
+        buf_ptr->restore();
+        buf_ptr = old_buf_ptr;
+    }
+
 
     /*Konstruktor kopiujący. Powinien mieć semantykę copy-on-write, a więc nie
       kopiuje wewnętrznych struktur danych, jeśli nie jest to potrzebne. Słowniki
       współdzielą struktury do czasu modyfikacji jednej z nich.
       złożoność czasowa O(1) lub oczekiwana O(n), jeśli konieczne jest wykonanie kopii.
       insertion_ordered_map(insertion_ordered_map const &other);*/
-    insertion_ordered_map<K, V, Hash>(const insertion_ordered_map<K,V,Hash>& other) {
-        if(other.buf_ptr->unsharable) {
+    insertion_ordered_map<K, V, Hash>(const insertion_ordered_map<K, V, Hash> &other) {
+        if (other.buf_ptr->unsharable) {
             buf_ptr = new map_buffer<K, V, Hash>(other.buf_ptr);
         } else {
             buf_ptr = other.buf_ptr;
@@ -116,44 +150,43 @@ public:
         buf_ptr = make_shared<map_buffer<V, K, Hash>>(move(*other.buf_ptr));
     }
 
-    V &operator[](K const &k){
+    V &operator[](K const &k) {
 
-        about_to_modify(true);
-
+        try {
+           about_to_modify(true);
+        } catch (bad_alloc &e) {
+            throw;
+        }
         auto it = buf_ptr->map.find(k);
-        if(it != buf_ptr->map.end()){ // found
+        if (it != buf_ptr->map.end()) { // found
             return it->second.value;
         } else {
 
             try {
-                shared_ptr<insertion_ordered_map<K, V, Hash>> tmpCopy = make_shared(*this); // copy our structure
-
                 shared_ptr<list_entry<K, V>> valueEntry = make_shared(list_entry(V()));
 
-                tmpCopy.insert({k, *valueEntry});
-                tmpCopy.last->next = valueEntry;
-                valueEntry->previous = tmpCopy.last;
-                tmpCopy.last = valueEntry;
-
-                buf_ptr = &tmpCopy; // swap
+                buf_ptr.insert({k, *valueEntry});
+                buf_ptr.last->next = valueEntry;
+                valueEntry->previous = buf_ptr.last;
+                buf_ptr.last = valueEntry;
 
                 return valueEntry->value;
 
             } catch (bad_alloc &e) {
-                // chyba nic poza wyrzuceniem do góry
+                restore();
                 throw;
             }
         }
     }
 
-  /*
-    Usuwanie ze słownika. Usuwa wartość znajdującą się pod podanym kluczem k.
-    Jeśli taki klucz nie istnieje, to podnosi wyjątek lookup_error.
-    Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
+    /*
+      Usuwanie ze słownika. Usuwa wartość znajdującą się pod podanym kluczem k.
+      Jeśli taki klucz nie istnieje, to podnosi wyjątek lookup_error.
+      Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
     void erase(K const &k) {
         auto it = buf_ptr->map.find(k);
 
-        if(it != buf_ptr->map.end()) { // found
+        if (it != buf_ptr->map.end()) { // found
             auto p = it.second->prev;
             auto n = it.second->next;
             p->next = n;
@@ -163,6 +196,7 @@ public:
             throw lookup_error();
         }
     }
+
     /*
     Scalanie słowników. Dodaje kopie wszystkich elementów podanego słownika other
     do bieżącego słownika (this). Wartości pod kluczami już obecnymi w bieżącym
@@ -177,12 +211,12 @@ public:
 };
 
 
-template <typename K, typename V>
+template<typename K, typename V>
 class it {
     shared_ptr<K> first;
     shared_ptr<list_entry<K, V>> second;
 public:
-    it(){
+    it() {
         //first = make_shared(NULL);
         //second = make_shared(NULL);
         return *this;
@@ -198,11 +232,10 @@ public:
         }
     }
 
-    it& operator++(){
+    it &operator++() {
         first = make_shared((*this).second->next);
     }
 };
-
 
 
 #endif //INSERTION_ORDERED_MAP_INSERTION_ORDERED_MAP_H
