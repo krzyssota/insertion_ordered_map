@@ -29,6 +29,8 @@ public :
     bool unsharable;
     bool old_unsharable;
 
+    using iterator = typename list<pair<K, V>>::const_iterator;
+
     void memorize() {
         old_unsharable = unsharable;
         old_refs = refs;
@@ -78,8 +80,6 @@ public :
 template<class K, class V>
 class insertion_ordered_map {
 
-
-
     shared_ptr<map_buffer<K, V>> buf_ptr;
 
     shared_ptr<map_buffer<K, V>> old_buf_ptr;
@@ -115,6 +115,15 @@ class insertion_ordered_map {
     }
 
 public:
+
+    using iterator = typename map_buffer<K, V>::iterator;
+
+    iterator begin() const noexcept {
+        return buf_ptr->ordered_list.begin();
+    }
+    iterator end() const noexcept {
+        return buf_ptr->ordered_list.end();
+    }
 
     void print() {
         for (auto x: buf_ptr->ordered_list) {
@@ -258,6 +267,11 @@ public:
       Jeśli taki klucz nie istnieje, to podnosi wyjątek lookup_error.
       Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
     void erase(K const &k) {
+        try {
+            about_to_modify(false); // potencjalny restore w środku
+        } catch (bad_alloc &e) {
+            throw;
+        }
         auto map_it = buf_ptr->map_data.find(k);
 
         if (map_it != buf_ptr->map_data.end()) { // found
@@ -280,7 +294,7 @@ public:
     /*
     Scalanie słowników. Dodaje kopie wszystkich elementów podanego słownika other
     do bieżącego słownika (this). Wartości pod kluczami już obecnymi w bieżącym
-            słowniku nie są nadpisywane. Klucze ze słownika other pojawiają się w porządku
+    słowniku nie są nadpisywane. Klucze ze słownika other pojawiają się w porządku
     iteracji na końcu, zachowując kolejność względem siebie.
     Złożoność czasowa oczekiwana O(n + m), gdzie m to rozmiar słownika other.*/
     void merge(insertion_ordered_map const &other) {
