@@ -229,36 +229,36 @@ public:
     Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania słownika.*/
     bool insert(K const &k, V const &v) {
 
-        auto list_ = buf_ptr->ordered_list;
-        auto map_ = buf_ptr->map_data;
+        //auto list_ = buf_ptr->ordered_list;
+        //auto map_ = buf_ptr->map_data;
         typename std::list<pair<K, V>>::iterator list_it;
-        auto map_it = map_.find(k);
+        auto map_it = buf_ptr->map_data.find(k);
 
-        if(map_it == map_.end()) { // not in the map
+        if(map_it == buf_ptr->map_data.end()) { // not in the map
 
             try {
                 about_to_modify(true); // potencjalny restore w środku
                 auto newPair = make_pair(k, v);
-                list_.push_back(newPair);
-                list_it = --list_.end(); // pointing at new element
+                buf_ptr->ordered_list.push_back(newPair);
+                list_it = --(buf_ptr->ordered_list.end()); // pointing at new element
             } catch (bad_alloc &e) {
                 // newPair not added to the list
                 throw;
             }
             try {
-                map_.insert({k, list_it});
+                buf_ptr->map_data.insert({k, list_it});
                 return true;
             } catch (bad_alloc &e) {
-                list_.erase(list_it);
+                buf_ptr->ordered_list.erase(list_it);
                 throw;
             }
         } else { // key already contained in the map
             list_it = map_it->second;
             pair<K, V> touched_element = make_pair(list_it->first, list_it->second);
-            list_.erase(list_it);
-            list_.push_back(touched_element);
+            buf_ptr->ordered_list.erase(list_it);
+            buf_ptr->ordered_list.push_back(touched_element);
             // dlaczego szare?
-            map_[k] = --list_.end(); // iterator to the moved element
+            buf_ptr->map_data[k] = --buf_ptr->ordered_list.end(); // iterator to the moved element
         }
     }
 
@@ -279,6 +279,7 @@ public:
             buf_ptr->map_data.erase(map_it);
             buf_ptr->ordered_list.erase(list_it);
         } else {
+            restore();
             throw lookup_error();
         }
     }
