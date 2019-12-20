@@ -263,6 +263,7 @@ public:
     }
 
     /*
+     *
       Usuwanie ze słownika. Usuwa wartość znajdującą się pod podanym kluczem k.
       Jeśli taki klucz nie istnieje, to podnosi wyjątek lookup_error.
       Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
