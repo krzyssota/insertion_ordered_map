@@ -78,6 +78,8 @@ public :
 template<class K, class V>
 class insertion_ordered_map {
 
+
+
     shared_ptr<map_buffer<K, V>> buf_ptr;
 
     shared_ptr<map_buffer<K, V>> old_buf_ptr;
@@ -113,6 +115,13 @@ class insertion_ordered_map {
     }
 
 public:
+
+    void print() {
+        for (auto x: buf_ptr->ordered_list) {
+            cout << "key: " << x.first << ", value: " << x.second << endl;
+        }
+        cout << endl;
+    }
 
     void memorize() {
         buf_ptr->memorize();
