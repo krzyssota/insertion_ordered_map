@@ -20,8 +20,9 @@ class lookup_error : public exception {
 
 template<class K, class V, class Hash = std::hash<K>>
 class map_buffer {
-//    unordered_map<K, list_entry<K, V>, Hash> map;
-    unordered_map<K, iterator<bidirectional_iterator_tag, list<K, V>>, Hash> map;
+
+    unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash> map;
+
     list<pair<K, V>> list;
 
 //    shared_ptr<list_entry<K, V>> first;
@@ -151,6 +152,42 @@ public:
                 restore();
                 throw;
             }
+        }
+    }
+
+    /*
+    Wstawianie do słownika.
+     Jeśli klucz k nie jest przechowywany w słowniku, to
+    wstawia wartość v pod kluczem k i zwraca true.
+     Jeśli klucz k już jest w słowniku, to wartość pod nim przypisana nie zmienia się, ale klucz zostaje
+    przesunięty na koniec porządku iteracji, a metoda zwraca false.
+     Jeśli jest to
+            możliwe, należy unikać kopiowania elementów przechowywanych już w słowniku.
+    Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania słownika.*/
+    bool insert(K const &k, V const &v) {
+        auto l = buf_ptr->list;
+        auto m = buf_ptr->map;
+        typename std::list<pair<K, V>>::iterator it;
+
+        if(m.find(k) == m.end()) { // not in the map
+            //typename std::iterator<bidirectional_iterator_tag, list<K, V>> it;
+            try {
+                about_to_modify(true); // potencjalny restore w środku
+                auto newPair = {k, v};
+                auto it = l.push_back(newPair);
+            } catch (bad_alloc &e) {
+                // newPair not added to the list
+                throw;
+            }
+            try {
+                m.insert({k, it});
+                return true;
+            } catch (bad_alloc &e) {
+                l.erase(it);
+                throw;
+            }
+        } else {
+
         }
     }
 
