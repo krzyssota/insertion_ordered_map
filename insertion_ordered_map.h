@@ -1,9 +1,9 @@
-#ifndef ISERTION_ORDERED_MAP_INSERTION_ORDERED_MAP_H
-#define ISERTION_ORDERED_MAP_INSERTION_ORDERED_MAP_H
+#ifndef INSERTION_ORDERED_MAP_INSERTION_ORDERED_MAP_H
+#define INSERTION_ORDERED_MAP_INSERTION_ORDERED_MAP_H
 
 #include <iostream>
 #include <unordered_map>
-#include <bits/shared_ptr.h>
+#include <memory>
 #include <list>
 
 
@@ -18,18 +18,16 @@ class lookup_error : public exception {
 template<class K, class V, class Hash = std::hash<K>>
 class map_buffer {
 
-    unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash> map;
+public :
 
-    list<pair<K, V>> list;
+    unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash> map_data;
 
-//    shared_ptr<list_entry<K, V>> first;
-//    shared_ptr<list_entry<K, V>> last;
+    list<pair<K, V>> ordered_list;
+
     unsigned refs;
     unsigned old_refs;
     bool unsharable;
     bool old_unsharable;
-
-public :
 
     void memorize() {
         old_unsharable = unsharable;
@@ -41,22 +39,27 @@ public :
         refs = old_refs;
     }
 
+    map_buffer() : refs(1), old_refs(1), unsharable(false), old_unsharable(false),
+                   map_data(), ordered_list() {
+
+    }
+
     map_buffer(const map_buffer<K, V, Hash> &other)  // copy constructor
-            : map(other.map), list(other.list),
+            : map_data(other.map_data), ordered_list(other.ordered_list),
               refs(1), unsharable(false) {
     }
 
     map_buffer &operator=(const map_buffer &other) {
-        this->map = map(other.map); // tutaj kopia
-        this->list = list(other.list);
+        this->map_data = map_data(other.map_data);
+        this->ordered_list = ordered_list(other.ordered_list);
         this->refs = 1;
         this->unsharable = false;
         return *this;
     }
 
     map_buffer(map_buffer<K, V, Hash> &&other) noexcept {
-        map = move(other.map);
-        list = move(other.list);
+        map_data = move(other.map_data);
+        ordered_list = move(other.ordered_list);
         refs = other.refs;
         unsharable = other.unsharable;
     }
@@ -65,9 +68,9 @@ public :
 template<class K, class V, class Hash = std::hash<K>>
 class insertion_ordered_map {
 
-    shared_ptr<map_buffer<K, V, Hash>> old_buf_ptr;
-
     shared_ptr<map_buffer<K, V, Hash>> buf_ptr;
+
+    shared_ptr<map_buffer<K, V, Hash>> old_buf_ptr;
 
     shared_ptr<map_buffer<K, V, Hash>> about_to_modify(bool mark_unsharable = false) {
 
@@ -78,7 +81,9 @@ class insertion_ordered_map {
         if (buf_ptr->refs > 1) { // && !buf_ptr->unsharable
             shared_ptr<map_buffer<K, V, Hash>> new_buf_ptr;
             try {
-                new_buf_ptr = make_shared(*buf_ptr);
+
+                new_buf_ptr = make_shared<map_buffer<K, V, Hash>>(*buf_ptr);
+
             }
             catch (bad_alloc &e) {
                 // chyba zalezy od miejsca wywołania about_to_modify
@@ -111,23 +116,48 @@ public:
         buf_ptr = old_buf_ptr;
     }
 
+    insertion_ordered_map() {
+        buf_ptr = make_shared<map_buffer<K, V, Hash>>();
+        old_buf_ptr = buf_ptr;
+    };
 
     /*Konstruktor kopiujący. Powinien mieć semantykę copy-on-write, a więc nie
       kopiuje wewnętrznych struktur danych, jeśli nie jest to potrzebne. Słowniki
       współdzielą struktury do czasu modyfikacji jednej z nich.
       złożoność czasowa O(1) lub oczekiwana O(n), jeśli konieczne jest wykonanie kopii.
       insertion_ordered_map(insertion_ordered_map const &other);*/
-    insertion_ordered_map<K, V, Hash>(const insertion_ordered_map<K, V, Hash> &other) {
+    insertion_ordered_map(const insertion_ordered_map &other) {
         if (other.buf_ptr->unsharable) {
-            buf_ptr = new map_buffer<K, V, Hash>(other.buf_ptr);
+
+            buf_ptr = make_shared<map_buffer<K, V, Hash>>(*(other.buf_ptr));
+            old_buf_ptr = buf_ptr;
+
         } else {
+
+            buf_ptr = other.buf_ptr;
+            old_buf_ptr = buf_ptr;
+            ++buf_ptr->refs;
+
+        }
+    }
+
+    insertion_ordered_map &operator=(insertion_ordered_map &other) {
+        if (other.buf_ptr->unsharable) {
+
+            buf_ptr = make_shared<map_buffer<K, V, Hash>>(*(other.buf_ptr));
+            old_buf_ptr = buf_ptr;
+
+        } else {
+
             buf_ptr = other.buf_ptr;
             ++buf_ptr->refs;
         }
+        return *this;
     }
 
     insertion_ordered_map(insertion_ordered_map &&other) noexcept {
         buf_ptr = make_shared<map_buffer<V, K, Hash>>(move(*other.buf_ptr));
+        old_buf_ptr = buf_ptr;
     }
 
     V &operator[](K const &k) {
@@ -137,21 +167,21 @@ public:
         } catch (bad_alloc &e) {
             throw;
         }
-        auto it = buf_ptr->map.find(k);
-        if (it != buf_ptr->map.end()) { // found
-            return (*(it->second.value)).second;
+        auto it = buf_ptr->map_data.find(k);
+        if (it != buf_ptr->map_data.end()) { // found
+            return (*(it->second)).second;
         } else {
             try {
-                buf_ptr->list.push_back(k, V());
+                buf_ptr->ordered_list.push_back({k, V()});
             } catch (bad_alloc &e) {
                 restore();
                 throw;
             }
             try {
-                buf_ptr->map.insert(k, V());
+                buf_ptr->map_data.insert(k, V());
             } catch (bad_alloc &e) {
                 restore();
-                buf_ptr->list.pop_back();
+                buf_ptr->ordered_list.pop_back();
                 throw;
             }
         }
@@ -167,29 +197,37 @@ public:
             możliwe, należy unikać kopiowania elementów przechowywanych już w słowniku.
     Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania słownika.*/
     bool insert(K const &k, V const &v) {
-        auto l = buf_ptr->list;
-        auto m = buf_ptr->map;
-        typename std::list<pair<K, V>>::iterator it;
 
-        if(m.find(k) == m.end()) { // not in the map
-            //typename std::iterator<bidirectional_iterator_tag, list<K, V>> it;
+        auto list_ = buf_ptr->ordered_list;
+        auto map_ = buf_ptr->map_data;
+        typename std::list<pair<K, V>>::iterator list_it;
+        typename std::unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash> map_it = map_.find(k);
+
+        if(map_it == map_.end()) { // not in the map
+
             try {
                 about_to_modify(true); // potencjalny restore w środku
                 auto newPair = {k, v};
-                auto it = l.push_back(newPair);
+                list_.push_back(newPair);
+                list_it = list_.end() - 1; // pointing at new element
             } catch (bad_alloc &e) {
                 // newPair not added to the list
                 throw;
             }
             try {
-                m.insert({k, it});
+                map_.insert({k, list_it});
                 return true;
             } catch (bad_alloc &e) {
-                l.erase(it);
+                list_.erase(list_it);
                 throw;
             }
-        } else {
-
+        } else { // key already contained in the map
+            list_it = map_it.second;
+            pair<K, V> touched_element = {list_it.first, list_it.second};
+            list_.erase(list_it);
+            list_.push_back(touched_element);
+            // dlaczego szare?
+            map_[k] = list_.end() - 1; // iterator to the moved element
         }
     }
 
@@ -198,12 +236,12 @@ public:
       Jeśli taki klucz nie istnieje, to podnosi wyjątek lookup_error.
       Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
     void erase(K const &k) {
-        auto map_it = buf_ptr->map.find(k);
+        auto map_it = buf_ptr->map_data.find(k);
 
-        if (map_it != buf_ptr->map.end()) { // found
+        if (map_it != buf_ptr->map_data.end()) { // found
             auto list_it = (*map_it).second;
-            buf_ptr->map.erase(map_it);
-            buf_ptr->list.erase(list_it);
+            buf_ptr->map_data.erase(map_it);
+            buf_ptr->ordered_list.erase(list_it);
         } else {
             throw lookup_error();
         }
@@ -218,8 +256,6 @@ public:
     void merge(insertion_ordered_map const &other) {
 
     }
-
-
 };
 
 
