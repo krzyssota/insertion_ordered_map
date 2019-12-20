@@ -260,6 +260,14 @@ public:
         }
     }
 
+    size_t size() {
+        return buf_ptr->map_data.size();
+    }
+
+    bool contains(K const &k) {
+
+    }
+
     /*
     Scalanie słowników. Dodaje kopie wszystkich elementów podanego słownika other
     do bieżącego słownika (this). Wartości pod kluczami już obecnymi w bieżącym
