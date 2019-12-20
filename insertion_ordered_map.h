@@ -141,14 +141,19 @@ public:
         }
         auto it = buf_ptr->map.find(k);
         if (it != buf_ptr->map.end()) { // found
-            return it->second.value;
+            return (*(it->second.value)).second;
         } else {
-
             try {
-                
-
+                buf_ptr->list.push_back(k, V());
             } catch (bad_alloc &e) {
                 restore();
+                throw;
+            }
+            try {
+                buf_ptr->map.insert(k, V());
+            } catch (bad_alloc &e) {
+                restore();
+                buf_ptr->list.pop_back();
                 throw;
             }
         }
@@ -159,14 +164,12 @@ public:
       Jeśli taki klucz nie istnieje, to podnosi wyjątek lookup_error.
       Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
     void erase(K const &k) {
-        auto it = buf_ptr->map.find(k);
+        auto map_it = buf_ptr->map.find(k);
 
-        if (it != buf_ptr->map.end()) { // found
-            auto p = it.second->prev;
-            auto n = it.second->next;
-            p->next = n;
-            n->prev = p;
-            buf_ptr->map.erase(k);
+        if (map_it != buf_ptr->map.end()) { // found
+            auto list_it = (*map_it).second;
+            buf_ptr->map.erase(map_it);
+            buf_ptr->list.erase(list_it);
         } else {
             throw lookup_error();
         }
@@ -186,31 +189,31 @@ public:
 };
 
 
-template<typename K, typename V>
-class it {
-    shared_ptr<K> first;
-    shared_ptr<list_entry<K, V>> second;
-public:
-    it() {
-        //first = make_shared(NULL);
-        //second = make_shared(NULL);
-        return *this;
-    }
-
-    it(it<K, V> &other) {
-        try {
-            first = make_shared(other.first);
-            second = make_shared(other.second);
-        } catch (bad_alloc &e) {
-            // ?
-            throw;
-        }
-    }
-
-    it &operator++() {
-        first = make_shared((*this).second->next);
-    }
-};
+//template<typename K, typename V>
+//class it {
+//    shared_ptr<K> first;
+//    shared_ptr<list_entry<K, V>> second;
+//public:
+//    it() {
+//        //first = make_shared(NULL);
+//        //second = make_shared(NULL);
+//        return *this;
+//    }
+//
+//    it(it<K, V> &other) {
+//        try {
+//            first = make_shared(other.first);
+//            second = make_shared(other.second);
+//        } catch (bad_alloc &e) {
+//            // ?
+//            throw;
+//        }
+//    }
+//
+//    it &operator++() {
+//        first = make_shared((*this).second->next);
+//    }
+//};
 
 
 #endif //INSERTION_ORDERED_MAP_INSERTION_ORDERED_MAP_H
