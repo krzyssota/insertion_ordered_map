@@ -45,8 +45,14 @@ public :
     }
 
     map_buffer(const map_buffer<K, V> &other)  // copy constructor
-            : map_data(other.map_data), ordered_list(other.ordered_list),
-              refs(1), old_refs(1), unsharable(false), old_unsharable(false) {
+
+            : ordered_list(other.ordered_list),
+              refs(1), old_refs(1), unsharable(false), old_unsharable(false), map_data() {
+        auto it = ordered_list.begin();
+        while (it != ordered_list.end()) {
+            map_data[it->first] = it;
+            it++;
+        }
     }
 
     map_buffer &operator=(const map_buffer &other) {
@@ -230,7 +236,7 @@ public:
             list_.erase(list_it);
             list_.push_back(touched_element);
             // dlaczego szare?
-            map_[k] = list_.end() - 1; // iterator to the moved element
+            map_[k] = --list_.end(); // iterator to the moved element
         }
     }
 
