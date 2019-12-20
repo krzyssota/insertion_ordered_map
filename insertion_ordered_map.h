@@ -51,6 +51,7 @@ public :
               refs(1), old_refs(1), unsharable(false), old_unsharable(false), map_data() {
         auto it = ordered_list.begin();
         while (it != ordered_list.end()) {
+            // ??? czy nie moze byc tutaj bad alloc?
             map_data[it->first] = it;
             it++;
         }
@@ -217,6 +218,25 @@ public:
             }
         }
     }
+   /*
+    Referencja wartości. Zwraca referencję na wartość przechowywaną w słowniku pod
+    podanym kluczem k. Jeśli taki klucz nie istnieje w słowniku, to podnosi
+    wyjątek lookup_error. Metoda ta powinna być dostępna w wersji z atrybutem
+    const oraz bez niego.
+    Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
+    V &at(K const &k) {
+
+    }
+    V const &at(K const &k) const {
+        //todo na szybko, moze byc cos nie tak
+        auto map_it = buf_ptr->map_data.find(k);
+
+        if (map_it != buf_ptr->map_data.end()) { // found
+            return map_it->second;
+        } else {
+            throw lookup_error();
+        }
+    }
 
     /*
     Wstawianie do słownika.
@@ -300,7 +320,7 @@ public:
     iteracji na końcu, zachowując kolejność względem siebie.
     Złożoność czasowa oczekiwana O(n + m), gdzie m to rozmiar słownika other.*/
     void merge(insertion_ordered_map const &other) {
-
+        // dzieki zlozonosci O(n+m) mozna zrobic swap zamiast roll back
     }
 };
 
