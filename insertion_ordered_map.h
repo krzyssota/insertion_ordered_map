@@ -168,7 +168,7 @@ public:
         }
     }
 
-    insertion_ordered_map &operator=(insertion_ordered_map &other) {
+    insertion_ordered_map &operator=(const insertion_ordered_map &other) {
         if (other.buf_ptr->unsharable) {
 
             buf_ptr = make_shared<map_buffer<K, V>>(*(other.buf_ptr));
@@ -293,7 +293,14 @@ public:
         } catch (bad_alloc &e) {
             throw;
         }
-        auto map_it = buf_ptr->map_data.find(k);
+//        about_to_modify(false);
+        typename unordered_map<K, typename std::list<pair<K, V>>::iterator>::iterator map_it;
+        try {
+            map_it = buf_ptr->map_data.find(k);
+        }
+        catch (exception &e) {
+            restore();
+        }
 
         if (map_it != buf_ptr->map_data.end()) { // found
             auto list_it = (*map_it).second;
