@@ -398,8 +398,6 @@ public:
             //cout << "insert " << x.first << " " << x.second << endl;
             new_iom.insert(x.first, x.second);
         }
-        //cout << "after 2\n";
-        //new_iom.print();
         *this = new_iom;
     }
 };
