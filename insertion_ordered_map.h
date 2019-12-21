@@ -169,6 +169,9 @@ public:
     }
 
     insertion_ordered_map &operator=(const insertion_ordered_map &other) {
+        if (this == &other) {
+            return *this;
+        }
         if (other.buf_ptr->unsharable) {
 
             buf_ptr = make_shared<map_buffer<K, V, Hash>>(*(other.buf_ptr));
@@ -178,6 +181,7 @@ public:
 
             buf_ptr = other.buf_ptr;
             ++buf_ptr->refs;
+
         }
         return *this;
     }
