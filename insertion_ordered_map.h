@@ -49,6 +49,7 @@ public :
     map_buffer(const map_buffer &other)  // copy constructor
             : ordered_list(other.ordered_list),
               refs(1), old_refs(1), unsharable(false), old_unsharable(false), map_data() {
+        //cout << "copy constructor map_buffer dla " << &other << endl;
         auto it = ordered_list.begin();
         while (it != ordered_list.end()) {
             // ??? czy nie moze byc tutaj bad alloc?
@@ -86,6 +87,7 @@ class insertion_ordered_map {
     shared_ptr<map_buffer<K, V, Hash>> old_buf_ptr;
 
     shared_ptr<map_buffer<K, V, Hash>> about_to_modify(bool mark_unsharable = false) {
+        //cout << "about to modify dla " << this << ", mark_unsharable = " << mark_unsharable << endl;
 
         memorize();
 
@@ -127,10 +129,20 @@ public:
     }
 
     void print() {
+        //cout << endl;
+        //cout << "------------------------------------------------------------\n";
+        //cout << "|                   print " << this << "                   |\n";
+        //cout << "------------------------------------------------------------\n";
+
+        //cout << "refs buffera: " << buf_ptr->refs << endl;
+        //cout << "buffer unsharable: " << buf_ptr->unsharable << endl;
+        //cout << "adres buffera: " << buf_ptr << "\n\n";
+
         for (auto x: buf_ptr->ordered_list) {
-            cout << "key: " << x.first << ", value: " << x.second << endl;
+            //cout << "key: " << x.first << ", value: " << x.second << endl;
         }
-        cout << endl;
+        //cout << "------------------------------------------------------------\n";
+        //cout << "\n\n\n";
     }
 
     void memorize() {
@@ -154,6 +166,7 @@ public:
       złożoność czasowa O(1) lub oczekiwana O(n), jeśli konieczne jest wykonanie kopii.
       insertion_ordered_map(insertion_ordered_map const &other);*/
     insertion_ordered_map(const insertion_ordered_map &other) {
+        //cout << "copy constructor iom dla " << &other << endl;
         if (other.buf_ptr->unsharable) {
 
             buf_ptr = make_shared<map_buffer<K, V, Hash>>(*(other.buf_ptr));
@@ -283,7 +296,7 @@ public:
         if(map_it == buf_ptr->map_data.end()) { // not in the map
 
             try {
-                about_to_modify(true); // potencjalny restore w środku
+                about_to_modify(false); // potencjalny restore w środku
                 auto newPair = make_pair(k, v);
                 buf_ptr->ordered_list.push_back(newPair);
                 list_it = --(buf_ptr->ordered_list.end()); // pointing at new element
@@ -360,7 +373,7 @@ public:
     Złożoność czasowa O(n).*/
     void clear() {
         try {
-            about_to_modify(true);
+            about_to_modify(false);
         } catch (exception &e) {
             throw;
         }
