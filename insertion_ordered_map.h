@@ -15,12 +15,12 @@ class lookup_error : public exception {
     }
 };
 
-template<class K, class V>
+template<class K, class V, typename Hash = std::hash<K>>
 class map_buffer {
 
 public :
 
-    unordered_map<K, typename std::list<pair<K, V>>::iterator> map_data;
+    unordered_map<K, typename std::list<pair<K, V>, Hash>::iterator> map_data;
 
     list<pair<K, V>> ordered_list;
 
@@ -46,7 +46,7 @@ public :
 
     }
 
-    map_buffer(const map_buffer<K, V> &other)  // copy constructor
+    map_buffer(const map_buffer &other)  // copy constructor
             : ordered_list(other.ordered_list),
               refs(1), old_refs(1), unsharable(false), old_unsharable(false), map_data() {
         auto it = ordered_list.begin();
@@ -70,7 +70,7 @@ public :
         return *this;
     }
 
-    map_buffer(map_buffer<K, V> &&other) noexcept {
+    map_buffer(map_buffer &&other) noexcept {
         map_data = move(other.map_data);
         ordered_list = move(other.ordered_list);
         refs = other.refs;
@@ -78,22 +78,22 @@ public :
     }
 };
 
-template<class K, class V>
+template<class K, class V, typename Hash = std::hash<K>>
 class insertion_ordered_map {
 
-    shared_ptr<map_buffer<K, V>> buf_ptr;
+    shared_ptr<map_buffer<K, V, Hash>> buf_ptr;
 
-    shared_ptr<map_buffer<K, V>> old_buf_ptr;
+    shared_ptr<map_buffer<K, V, Hash>> old_buf_ptr;
 
-    shared_ptr<map_buffer<K, V>> about_to_modify(bool mark_unsharable = false) {
+    shared_ptr<map_buffer<K, V, Hash>> about_to_modify(bool mark_unsharable = false) {
 
         memorize();
 
         if (buf_ptr->refs > 1) { // && !buf_ptr->unsharable
-            shared_ptr<map_buffer<K, V>> new_buf_ptr;
+            shared_ptr<map_buffer<K, V, Hash>> new_buf_ptr;
             try {
 
-                new_buf_ptr = make_shared<map_buffer<K, V>>(*buf_ptr);
+                new_buf_ptr = make_shared<map_buffer<K, V, Hash>>(*buf_ptr);
 
             }
             catch (bad_alloc &e) {
@@ -117,7 +117,7 @@ class insertion_ordered_map {
 
 public:
 
-    using iterator = typename map_buffer<K, V>::iterator;
+    using iterator = typename map_buffer<K, V, Hash>::iterator;
 
     iterator begin() const noexcept {
         return buf_ptr->ordered_list.begin();
@@ -144,7 +144,7 @@ public:
     }
 
     insertion_ordered_map() {
-        buf_ptr = make_shared<map_buffer<K, V>>();
+        buf_ptr = make_shared<map_buffer<K, V, Hash>>();
         old_buf_ptr = buf_ptr;
     };
 
@@ -156,7 +156,7 @@ public:
     insertion_ordered_map(const insertion_ordered_map &other) {
         if (other.buf_ptr->unsharable) {
 
-            buf_ptr = make_shared<map_buffer<K, V>>(*(other.buf_ptr));
+            buf_ptr = make_shared<map_buffer<K, V, Hash>>(*(other.buf_ptr));
             old_buf_ptr = buf_ptr;
 
         } else {
@@ -171,7 +171,7 @@ public:
     insertion_ordered_map &operator=(const insertion_ordered_map &other) {
         if (other.buf_ptr->unsharable) {
 
-            buf_ptr = make_shared<map_buffer<K, V>>(*(other.buf_ptr));
+            buf_ptr = make_shared<map_buffer<K, V, Hash>>(*(other.buf_ptr));
             old_buf_ptr = buf_ptr;
 
         } else {
@@ -183,7 +183,7 @@ public:
     }
 
     insertion_ordered_map(insertion_ordered_map &&other) noexcept {
-        buf_ptr = make_shared<map_buffer<V, K>>(move(*other.buf_ptr));
+        buf_ptr = make_shared<map_buffer<V, K, Hash>>(move(*other.buf_ptr));
         old_buf_ptr = buf_ptr;
     }
 
@@ -230,7 +230,7 @@ public:
        } catch (bad_alloc &e) {
            throw;
        }
-       typename unordered_map<K, typename std::list<pair<K, V>>::iterator>::iterator it;
+       typename unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash>::iterator it;
        try {
            it = buf_ptr->map_data.find(k);
        }
@@ -313,7 +313,7 @@ public:
             throw;
         }
 //        about_to_modify(false);
-        typename unordered_map<K, typename std::list<pair<K, V>>::iterator>::iterator map_it;
+        typename unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash>::iterator map_it;
         try {
             map_it = buf_ptr->map_data.find(k);
         }
