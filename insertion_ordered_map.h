@@ -283,6 +283,7 @@ public:
                 // newPair not added to the list
                 throw;
             }
+
             try {
                 buf_ptr->map_data.insert({k, list_it});
                 return true;
@@ -336,6 +337,27 @@ public:
 
     bool contains(K const &k) {
         return buf_ptr->map_data.find(k) != buf_ptr->map_data.end();
+    }
+
+    /*
+    Sprawdzenie niepustości słownika. Zwraca true, gdy słownik jest pusty, a false
+    w przeciwnym przypadku.
+    Złożoność czasowa O(1).*/
+    bool empty() const {
+        return buf_ptr->ordered_list.empty();
+    }
+
+    /*
+    Czyszczenie słownika. Usuwa wszystkie elementy ze słownika.
+    Złożoność czasowa O(n).*/
+    void clear() {
+        try {
+            about_to_modify(true);
+        } catch (exception &e) {
+            throw;
+        }
+        buf_ptr->map_data.clear();
+        buf_ptr->ordered_list.clear();
     }
 
     /*
