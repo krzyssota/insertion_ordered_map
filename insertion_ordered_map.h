@@ -182,6 +182,10 @@ public:
         return *this;
     }
 
+    ~insertion_ordered_map() {
+        --buf_ptr->refs;
+    }
+
     insertion_ordered_map(insertion_ordered_map &&other) noexcept {
         buf_ptr = make_shared<map_buffer<V, K, Hash>>(move(*other.buf_ptr));
         old_buf_ptr = buf_ptr;
