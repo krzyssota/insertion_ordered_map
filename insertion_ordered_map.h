@@ -313,12 +313,15 @@ public:
 
     void merge(insertion_ordered_map const &other) {
 
+        bool this_unsharable = this->buf_ptr->unsharable; // deep copy for range loop
+        this->buf_ptr->unsharable = true;
         auto new_iom = *this;
+        this->buf_ptr->unsharable = this_unsharable;
 
-        bool original_state = other.buf_ptr->unsharable; // deep copy for range loop
+        bool other_unsharable = other.buf_ptr->unsharable;
         other.buf_ptr->unsharable = true;
         auto other_copy = other;
-        other.buf_ptr->unsharable = original_state;
+        other.buf_ptr->unsharable = other_unsharable;
 
         // exception safety is achieved through working on a copy and swapping if no exception was thrown
         for (auto const x: other_copy) {
