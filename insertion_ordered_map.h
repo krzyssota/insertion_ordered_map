@@ -225,7 +225,25 @@ public:
     const oraz bez niego.
     Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
     V &at(K const &k) {
-
+       try {
+           about_to_modify(true);
+       } catch (bad_alloc &e) {
+           throw;
+       }
+       typename unordered_map<K, typename std::list<pair<K, V>>::iterator>::iterator it;
+       try {
+           it = buf_ptr->map_data.find(k);
+       }
+       catch (exception &e) {
+           restore();
+           throw;
+       }
+       if (it != buf_ptr->map_data.end()) { // found
+           return (*(it->second)).second;
+       } else {
+           // todo ??? restore()
+           throw lookup_error();
+       }
     }
     V const &at(K const &k) const {
         //todo na szybko, moze byc cos nie tak
@@ -323,34 +341,6 @@ public:
         // dzieki zlozonosci O(n+m) mozna zrobic swap zamiast roll back
     }
 };
-
-
-//template<typename K, typename V>
-//class it {
-//    shared_ptr<K> first;
-//    shared_ptr<list_entry<K, V>> second;
-//public:
-//    it() {
-//        //first = make_shared(NULL);
-//        //second = make_shared(NULL);
-//        return *this;
-//    }
-//
-//    it(it<K, V> &other) {
-//        try {
-//            first = make_shared(other.first);
-//            second = make_shared(other.second);
-//        } catch (bad_alloc &e) {
-//            // ?
-//            throw;
-//        }
-//    }
-//
-//    it &operator++() {
-//        first = make_shared((*this).second->next);
-//    }
-//};
-
 
 #endif //INSERTION_ORDERED_MAP_INSERTION_ORDERED_MAP_H
 
