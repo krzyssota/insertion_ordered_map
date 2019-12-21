@@ -213,7 +213,7 @@ public:
     V &operator[](K const &k) {
 
         try {
-           about_to_modify(true);
+            about_to_modify(true);
         } catch (bad_alloc &e) {
             throw;
         }
@@ -241,32 +241,32 @@ public:
             }
         }
     }
-   /*
-    Referencja wartości. Zwraca referencję na wartość przechowywaną w słowniku pod
-    podanym kluczem k. Jeśli taki klucz nie istnieje w słowniku, to podnosi
-    wyjątek lookup_error. Metoda ta powinna być dostępna w wersji z atrybutem
-    const oraz bez niego.
-    Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
+    /*
+     Referencja wartości. Zwraca referencję na wartość przechowywaną w słowniku pod
+     podanym kluczem k. Jeśli taki klucz nie istnieje w słowniku, to podnosi
+     wyjątek lookup_error. Metoda ta powinna być dostępna w wersji z atrybutem
+     const oraz bez niego.
+     Złożoność czasowa oczekiwana O(1) + ewentualny czas kopiowania.*/
     V &at(K const &k) {
-       try {
-           about_to_modify(true);
-       } catch (bad_alloc &e) {
-           throw;
-       }
-       typename unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash>::iterator it;
-       try {
-           it = buf_ptr->map_data.find(k);
-       }
-       catch (exception &e) {
-           restore();
-           throw;
-       }
-       if (it != buf_ptr->map_data.end()) { // found
-           return (*(it->second)).second;
-       } else {
-           // todo ??? restore()
-           throw lookup_error();
-       }
+        try {
+            about_to_modify(true);
+        } catch (bad_alloc &e) {
+            throw;
+        }
+        typename unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash>::iterator it;
+        try {
+            it = buf_ptr->map_data.find(k);
+        }
+        catch (...) {
+            restore();
+            throw;
+        }
+        if (it != buf_ptr->map_data.end()) { // found
+            return (*(it->second)).second;
+        } else {
+            // todo ??? restore()
+            throw lookup_error();
+        }
     }
     V const &at(K const &k) const {
         //todo na szybko, moze byc cos nie tak
@@ -319,7 +319,6 @@ public:
             pair<K, V> touched_element = make_pair(list_it->first, list_it->second);
             buf_ptr->ordered_list.erase(list_it);
             buf_ptr->ordered_list.push_back(touched_element);
-            // dlaczego szare?
             buf_ptr->map_data[k] = --buf_ptr->ordered_list.end(); // iterator to the moved element
         }
     }
@@ -340,7 +339,7 @@ public:
         try {
             map_it = buf_ptr->map_data.find(k);
         }
-        catch (exception &e) {
+        catch (...) {
             restore();
         }
 
@@ -376,7 +375,7 @@ public:
     void clear() {
         try {
             about_to_modify(false);
-        } catch (exception &e) {
+        } catch (...) {
             throw;
         }
         buf_ptr->map_data.clear();
