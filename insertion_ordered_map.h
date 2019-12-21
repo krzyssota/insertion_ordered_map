@@ -387,13 +387,19 @@ public:
     iteracji na końcu, zachowując kolejność względem siebie.
     Złożoność czasowa oczekiwana O(n + m), gdzie m to rozmiar słownika other.*/
     void merge(insertion_ordered_map const &other) {
-        if (this == &other) {
-            return;
-        }
+
         auto new_iom = *this;
-        for (auto const x: other) {
+        bool original_state = other.buf_ptr->unsharable;
+        other.buf_ptr->unsharable = true;
+        auto other_copy = other;
+        other.buf_ptr->unsharable = original_state;
+        //new_iom.print();
+        for (auto const x: other_copy) {
+            //cout << "insert " << x.first << " " << x.second << endl;
             new_iom.insert(x.first, x.second);
         }
+        //cout << "after 2\n";
+        //new_iom.print();
         *this = new_iom;
     }
 };
