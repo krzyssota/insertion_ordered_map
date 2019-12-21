@@ -367,7 +367,11 @@ public:
     iteracji na końcu, zachowując kolejność względem siebie.
     Złożoność czasowa oczekiwana O(n + m), gdzie m to rozmiar słownika other.*/
     void merge(insertion_ordered_map const &other) {
-        // dzieki zlozonosci O(n+m) mozna zrobic swap zamiast roll back
+        auto new_iom = *this;
+        for (auto const x: other) {
+            new_iom.insert(x);
+        }
+        *this = new_iom;
     }
 };
 
