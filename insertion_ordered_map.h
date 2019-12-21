@@ -20,7 +20,7 @@ class map_buffer {
 
 public :
 
-    unordered_map<K, typename std::list<pair<K, V>, Hash>::iterator> map_data;
+    unordered_map<K, typename std::list<pair<K, V>>::iterator, Hash> map_data;
 
     list<pair<K, V>> ordered_list;
 
@@ -369,7 +369,7 @@ public:
     void merge(insertion_ordered_map const &other) {
         auto new_iom = *this;
         for (auto const x: other) {
-            new_iom.insert(x);
+            new_iom.insert(x.first, x.second);
         }
         *this = new_iom;
     }
